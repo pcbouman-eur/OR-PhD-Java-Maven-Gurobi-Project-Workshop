@@ -1,0 +1,6 @@
+target/
+work/
+instances/
+solutions/
+.idea/
+*.iml

@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="cflp generate" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="org.example.cflp.cli.App" />
+    <module name="cflp" />
+    <option name="PROGRAM_PARAMETERS" value="generate --count 5 --facilities 30 --customers 150 -o work/instances" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

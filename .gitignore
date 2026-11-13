@@ -1,0 +1,25 @@
+# The original brief for this workshop, not for students
+/PROJECT.md
+
+# Never commit a Gurobi license
+gurobi.lic
+*.lic
+
+# Build output and files produced by running the steps (each step also has its own .gitignore)
+target/
+work/
+instances/
+solutions/
+results/
+logs/
+gz/
+*.instance.json
+*.solution.json
+*.events.jsonl
+
+# IDE and OS files
+.idea/
+*.iml
+.vscode/
+__pycache__/
+.DS_Store

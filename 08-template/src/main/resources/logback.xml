@@ -1,0 +1,68 @@
+<configuration>
+    <!-- Override on the command line: java -DLOG_DIR=/scratch/me/logs -jar cflp.jar ... -->
+    <property name="LOG_DIR" value="${LOG_DIR:-logs}"/>
+
+    <!-- Console: INFO and up, short format -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>${CONSOLE_LEVEL:-INFO}</level>
+        </filter>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%X{run:-main}] %logger{0} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- One file per run: the MDC value "run" picks the file, LOG_DIR/<run>.log -->
+    <appender name="RUN_FILE" class="ch.qos.logback.classic.sift.SiftingAppender">
+        <discriminator>
+            <key>run</key>
+            <defaultValue>cflp</defaultValue>
+        </discriminator>
+        <sift>
+            <appender name="FILE-${run}" class="ch.qos.logback.core.FileAppender">
+                <file>${LOG_DIR}/${run}.log</file>
+                <encoder>
+                    <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+                </encoder>
+            </appender>
+        </sift>
+    </appender>
+
+    <!-- Structured events (util/Events): one JSON line per event, LOG_DIR/<run>.events.jsonl -->
+    <appender name="EVENTS" class="ch.qos.logback.classic.sift.SiftingAppender">
+        <discriminator>
+            <key>run</key>
+            <defaultValue>cflp</defaultValue>
+        </discriminator>
+        <maxAppenderCount>4</maxAppenderCount>   <!-- keep at most 4 event files open in a batch -->
+        <sift>
+            <appender name="EVENTS-${run}" class="ch.qos.logback.core.FileAppender">
+                <file>${LOG_DIR}/${run}.events.jsonl</file>
+                <!-- logstash-logback-encoder: time, level, logger, MDC (run, runId) + the event's own fields -->
+                <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                    <fieldNames>
+                        <timestamp>time</timestamp>
+                        <logger>logger</logger>
+                        <version>[ignore]</version>
+                        <levelValue>[ignore]</levelValue>
+                        <thread>[ignore]</thread>
+                        <message>[ignore]</message>
+                    </fieldNames>
+                </encoder>
+            </appender>
+        </sift>
+    </appender>
+
+    <!-- Events go only to the events file (additivity=false: not to the console or the normal log) -->
+    <logger name="events" level="INFO" additivity="false">
+        <appender-ref ref="EVENTS"/>
+    </logger>
+
+    <!-- Per-logger levels: e.g. set "gurobi" to WARN to silence the solver log -->
+    <logger name="gurobi" level="INFO"/>
+
+    <root level="DEBUG">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="RUN_FILE"/>
+    </root>
+</configuration>

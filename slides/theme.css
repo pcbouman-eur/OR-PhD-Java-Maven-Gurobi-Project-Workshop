@@ -1,0 +1,17 @@
+/* @theme workshop */
+@import 'default';
+
+section {
+  font-size: 26px;
+  padding: 50px 60px;
+}
+section.lead h1 { font-size: 56px; }
+h1 { font-size: 40px; color: #1f4e79; }
+h2 { font-size: 30px; color: #1f4e79; }
+pre { font-size: 17px; line-height: 1.35; }
+code { font-size: 0.9em; }
+table { font-size: 22px; }
+.columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2em; }
+.small { font-size: 20px; }
+header, footer { font-size: 16px; color: #888; }
+section.dense pre { font-size: 15px; }

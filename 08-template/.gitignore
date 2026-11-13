@@ -1,0 +1,9 @@
+target/
+work/
+instances/
+results/
+logs/
+gz/
+.idea/
+*.iml
+__pycache__/

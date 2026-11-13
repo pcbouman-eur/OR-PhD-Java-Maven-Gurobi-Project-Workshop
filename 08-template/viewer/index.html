@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CFLP Solution Viewer</title>
+<style>
+  :root { --bg: #fafafa; --fg: #222; --muted: #888; --line: #bbb; --open: #1f77b4; --closed: #ccc; --card: #fff; --bad: #d62728; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1b1b1f; --fg: #eee; --muted: #999; --line: #555; --open: #5aa9e6; --closed: #444; --card: #26262b; --bad: #ff6b6b; }
+  }
+  body { margin: 0; font: 15px/1.4 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; grid-template-columns: 300px 1fr; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border-radius: 8px; padding: 14px; box-shadow: 0 1px 3px #0002; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  #drop { border: 2px dashed var(--line); border-radius: 8px; padding: 18px; text-align: center; color: var(--muted); cursor: pointer; }
+  #drop.over { border-color: var(--open); color: var(--fg); }
+  select { width: 100%; margin-top: 10px; padding: 4px; }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 10px 0 0; font-size: 13px; }
+  dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
+  svg { width: 100%; height: auto; display: block; }
+  .bad { color: var(--bad); }
+</style>
+</head>
+<body>
+<main>
+  <section class="card">
+    <h1>CFLP Solution Viewer</h1>
+    <div id="drop">Drop <code>*.instance.json[.gz]</code> and <code>*.solution.json</code> files here, or click to choose</div>
+    <input id="files" type="file" multiple hidden>
+    <select id="solutions"></select>
+    <dl id="info"></dl>
+  </section>
+  <section class="card"><svg id="plot" viewBox="-0.03 -0.03 1.06 1.06"></svg></section>
+</main>
+<script>
+const instances = new Map();   // instance id -> instance
+const solutions = [];          // [{file, sol}]
+
+async function readJson(file) {
+  // .gz files are decompressed in the browser
+  const stream = file.name.endsWith('.gz') ? file.stream().pipeThrough(new DecompressionStream('gzip')) : file.stream();
+  return new Response(stream).json();
+}
+
+async function addFiles(files) {
+  for (const file of files) {
+    const data = await readJson(file);
+    if (data.facilities) instances.set(data.id, data);
+    else if (data.assignment) solutions.push({ file: file.name, sol: data });
+  }
+  const select = document.getElementById('solutions');
+  select.innerHTML = solutions.map((s, i) => `<option value="${i}">${s.file}</option>`).join('');
+  if (solutions.length) show(solutions[solutions.length - 1]);
+  else if (instances.size) draw([...instances.values()][0], null);
+}
+
+function show({ sol }) {
+  const inst = instances.get(sol.instanceId);
+  const run = sol.run || {};
+  const rows = [
+    ['instance', sol.instanceName], ['solver', sol.solver], ['status', sol.status],
+    ['objective', sol.objective.toFixed(2)], ['runtime', sol.runtimeSeconds.toFixed(2) + ' s'],
+    ['open', `${sol.openFacilities.length} facilities`], ['experiment', run.experiment], ['label', run.label],
+    ['tags', run.tags && Object.entries(run.tags).map(([k, v]) => `${k}=${v}`).join(', ')],
+    ['parameters', run.parameters && Object.entries(run.parameters).map(([k, v]) => `${k}=${v}`).join(', ')],
+    ['run id', run.runId], ['started', run.startedAt], ['host', run.host], ['slurm job', run.slurmJobId],
+  ].filter(([, v]) => v != null && v !== '');
+  document.getElementById('info').innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')
+    + (inst ? '' : `<dt class="bad">!</dt><dd class="bad">instance ${sol.instanceId} not loaded</dd>`);
+  draw(inst, sol);
+}
+
+function draw(inst, sol) {
+  const svg = document.getElementById('plot');
+  if (!inst) { svg.innerHTML = ''; return; }
+  const open = new Set(sol ? sol.openFacilities : []);
+  const maxDemand = Math.max(...inst.customers.map(c => c.demand));
+  const maxCap = Math.max(...inst.facilities.map(f => f.capacity));
+  let out = '';
+  if (sol) inst.customers.forEach((c, i) => {
+    const f = inst.facilities[sol.assignment[i]];
+    out += `<line x1="${c.x}" y1="${1 - c.y}" x2="${f.x}" y2="${1 - f.y}" stroke="var(--line)" stroke-width="0.002"/>`;
+  });
+  inst.customers.forEach(c => {
+    out += `<circle cx="${c.x}" cy="${1 - c.y}" r="${0.004 + 0.008 * c.demand / maxDemand}" fill="var(--fg)" opacity="0.7"/>`;
+  });
+  inst.facilities.forEach((f, j) => {
+    const s = 0.012 + 0.018 * f.capacity / maxCap;
+    out += `<rect x="${f.x - s / 2}" y="${1 - f.y - s / 2}" width="${s}" height="${s}" fill="${open.has(j) ? 'var(--open)' : 'var(--closed)'}">`
+      + `<title>facility ${j}: capacity ${f.capacity}, fixed cost ${f.fixedCost}</title></rect>`;
+  });
+  svg.innerHTML = out;
+}
+
+const drop = document.getElementById('drop'), input = document.getElementById('files');
+drop.onclick = () => input.click();
+input.onchange = () => addFiles(input.files);
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); addFiles(e.dataTransfer.files); };
+document.getElementById('solutions').onchange = e => show(solutions[e.target.value]);
+</script>
+</body>
+</html>
